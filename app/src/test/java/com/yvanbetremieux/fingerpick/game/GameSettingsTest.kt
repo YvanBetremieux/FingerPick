@@ -1,6 +1,7 @@
 package com.yvanbetremieux.fingerpick.game
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class GameSettingsTest {
@@ -26,5 +27,17 @@ class GameSettingsTest {
     @Test fun sanitizedClampsBothValues() {
         assertEquals(GameSettings(12, 11), GameSettings.sanitized(40, 40))
         assertEquals(GameSettings(2, 1), GameSettings.sanitized(-1, 9))
+    }
+
+    @Test fun nextRemovesChosenPlayers() {
+        assertEquals(GameSettings(6, 2), GameSettings(8, 2).next())
+        assertEquals(GameSettings(4, 2), GameSettings(6, 2).next())
+        assertEquals(GameSettings(11, 1), GameSettings(12, 1).next())
+    }
+
+    @Test fun nextIsNullWhenTooFewPlayersRemain() {
+        assertNull(GameSettings(4, 2).next())
+        assertNull(GameSettings(5, 3).next())
+        assertNull(GameSettings(2, 1).next())
     }
 }

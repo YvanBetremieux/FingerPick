@@ -73,7 +73,10 @@ import kotlin.math.sin
 
 @Composable
 fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
-    val controller = remember(settings) { PlayController(settings) }
+    // "Continuer" narrows the round to the players not yet chosen; settings themselves stay untouched.
+    var round by remember(settings) { mutableStateOf(settings) }
+    val nextRound = round.next()
+    val controller = remember(round) { PlayController(round) }
     val clock = rememberUptimeClock()
     val phase by remember(controller) { derivedStateOf { controller.state.phase } }
     val count by remember(controller) { derivedStateOf { controller.state.fingers.size } }
@@ -87,7 +90,7 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
     }
     var buttonsVisible by remember(controller) { mutableStateOf(false) }
     // Most phones track at most 10 pointers: with 11-12 players the round can never start.
-    val atPointerLimit = phase == Phase.Waiting && count == 10 && settings.players > 10
+    val atPointerLimit = phase == Phase.Waiting && count == 10 && round.players > 10
     var showLimitHint by remember(controller) { mutableStateOf(false) }
     LaunchedEffect(atPointerLimit) {
         showLimitHint = false
@@ -160,8 +163,8 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val headline = when (phase) {
-                Phase.Result -> if (settings.winners == 1) "L'ÉLU" else "LES ÉLUS"
-                else -> "$count / ${settings.players}"
+                Phase.Result -> if (round.winners == 1) "L'ÉLU" else "LES ÉLUS"
+                else -> "$count / ${round.players}"
             }
             AnimatedContent(
                 targetState = headline,
@@ -171,7 +174,7 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
                 BasicText(text, style = CounterStyle.copy(color = if (phase == Phase.Result) soleWinnerColor ?: Mist else Mist))
             }
             Spacer(Modifier.height(6.dp))
-            BasicText(if (settings.winners == 1) "1 à choisir" else "${settings.winners} à choisir", style = CaptionStyle)
+            BasicText(if (round.winners == 1) "1 à choisir" else "${round.winners} à choisir", style = CaptionStyle)
         }
 
         AnimatedVisibility(
@@ -244,10 +247,26 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
             enter = fadeIn(tween(400)) + slideInVertically(tween(500, easing = FastOutSlowInEasing)) { it / 2 },
             exit = fadeOut(tween(150)),
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // The buttons linger through their exit fade; only act while the result is showing.
-                GlowButton("Réglages", onClick = { if (phase == Phase.Result) onExit() }, modifier = Modifier.weight(1f), primary = false)
-                GlowButton("Rejouer", onClick = { if (phase == Phase.Result) controller.replay(SystemClock.uptimeMillis()) }, modifier = Modifier.weight(1f))
+            // The buttons linger through their exit fade; only act while the result is showing.
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (nextRound != null) {
+                    GlowButton("Continuer", onClick = { if (phase == Phase.Result) round = nextRound }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    val left = round.players - round.winners
+                    BasicText(
+                        if (left == 1) "Le dernier restant forme le dernier groupe" else "Les $left derniers forment le dernier groupe",
+                        style = CaptionStyle,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    GlowButton("Réglages", onClick = { if (phase == Phase.Result) onExit() }, modifier = Modifier.weight(1f), primary = false)
+                    GlowButton(
+                        "Rejouer",
+                        onClick = { if (phase == Phase.Result) controller.replay(SystemClock.uptimeMillis()) },
+                        modifier = Modifier.weight(1f),
+                        primary = nextRound == null,
+                    )
+                }
             }
         }
     }
