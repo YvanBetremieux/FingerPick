@@ -170,8 +170,10 @@ private fun DotRow(total: Int, lit: Int) {
     Canvas(Modifier.fillMaxWidth().height(14.dp)) {
         val step = size.width / MAX_PLAYERS
         val radius = 4.dp.toPx()
+        // Same step on every card, so a shorter row is centered rather than left-aligned.
+        val offset = (MAX_PLAYERS - total) * step / 2f
         for (i in 0 until total) {
-            val c = Offset(step * (i + 0.5f), size.height / 2f)
+            val c = Offset(offset + step * (i + 0.5f), size.height / 2f)
             if (i < lit) {
                 drawCircle(NeonPalette[i], radius * 2.2f, c, alpha = 0.25f)
                 drawCircle(NeonPalette[i], radius, c)

@@ -14,18 +14,26 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
@@ -77,6 +86,18 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
         }
     }
     var buttonsVisible by remember(controller) { mutableStateOf(false) }
+    // Most phones track at most 10 pointers: with 11-12 players the round can never start.
+    val atPointerLimit = phase == Phase.Waiting && count == 10 && settings.players > 10
+    var showLimitHint by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(atPointerLimit) {
+        showLimitHint = false
+        if (atPointerLimit) {
+            delay(2000)
+            showLimitHint = true
+        }
+    }
+    // Stops a finger sliding in from a screen edge from triggering system back mid-round.
+    val protectEdges = phase == Phase.Waiting || phase == Phase.Countdown
 
     BackHandler(onBack = onExit)
 
@@ -128,6 +149,12 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
     ) {
         GlowCanvas(controller, clock)
 
+        if (protectEdges) {
+            // The system caps exclusion at 200dp per edge.
+            Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(200.dp).systemGestureExclusion())
+            Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(200.dp).systemGestureExclusion())
+        }
+
         Column(
             Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -160,6 +187,35 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
             )
         }
 
+        // A visible way out before any result exists.
+        AnimatedVisibility(
+            visible = phase == Phase.Waiting && count == 0,
+            modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
+            enter = fadeIn(tween(600)),
+            exit = fadeOut(tween(200)),
+        ) {
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .border(1.dp, Mist.copy(alpha = 0.18f), RoundedCornerShape(24.dp))
+                    .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onExit)
+                    .padding(horizontal = 18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                BasicText("Réglages", style = CaptionStyle.copy(color = MistDim))
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showLimitHint,
+            modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
+            enter = fadeIn(tween(400)),
+            exit = fadeOut(tween(200)),
+        ) {
+            BasicText("Cet écran détecte peut-être 10 doigts maximum", style = CaptionStyle)
+        }
+
         AnimatedContent(
             targetState = if (phase == Phase.Countdown) countdown else 0,
             modifier = Modifier.align(Alignment.Center),
@@ -189,8 +245,9 @@ fun PlayScreen(settings: GameSettings, haptics: Haptics, onExit: () -> Unit) {
             exit = fadeOut(tween(150)),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                GlowButton("Réglages", onClick = onExit, modifier = Modifier.weight(1f), primary = false)
-                GlowButton("Rejouer", onClick = { controller.replay(SystemClock.uptimeMillis()) }, modifier = Modifier.weight(1f))
+                // The buttons linger through their exit fade; only act while the result is showing.
+                GlowButton("Réglages", onClick = { if (phase == Phase.Result) onExit() }, modifier = Modifier.weight(1f), primary = false)
+                GlowButton("Rejouer", onClick = { if (phase == Phase.Result) controller.replay(SystemClock.uptimeMillis()) }, modifier = Modifier.weight(1f))
             }
         }
     }

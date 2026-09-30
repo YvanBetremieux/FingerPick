@@ -16,7 +16,7 @@ class Haptics(context: Context) {
         }
 
     // Built once: these fire on touch and per countdown second.
-    private val touchEffect = VibrationEffect.createOneShot(12, 90)
+    private val touchEffect = VibrationEffect.createOneShot(20, 120)
     private val tickEffect = VibrationEffect.createOneShot(28, 180)
     private val revealEffect =
         VibrationEffect.createWaveform(longArrayOf(0, 70, 60, 180), intArrayOf(0, 255, 0, 255), -1)
